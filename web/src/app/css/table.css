@@ -13,10 +13,10 @@
 }
 
 .tbl-cell-inner[data-size="regular"] {
-  @apply h-10 px-1;
+  @apply h-[44px] px-1;
 }
 .tbl-cell-inner[data-size="small"] {
-  @apply h-6 px-0.5;
+  @apply h-[36px] px-0.5;
 }
 
 /* ---- TableHead ---- */
