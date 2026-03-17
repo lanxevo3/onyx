@@ -12,7 +12,7 @@ import { localizeAndPrettify } from "@/lib/time";
 import Button from "@/refresh-components/buttons/Button";
 import Text from "@/refresh-components/texts/Text";
 import { PageSelector } from "@/components/PageSelector";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { SvgAlertTriangle } from "@opal/icons";
 export interface IndexAttemptErrorsModalProps {
   errors: {
@@ -34,62 +34,33 @@ export default function IndexAttemptErrorsModal({
   isResolvingErrors = false,
   pageSize: propPageSize,
 }: IndexAttemptErrorsModalProps) {
+  const ROW_HEIGHT = 60;
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [calculatedPageSize, setCalculatedPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Reset to page 1 when the error list actually changes
   useEffect(() => {
     setCurrentPage(1);
   }, [errors.items.length, errors.total_items]);
 
   useEffect(() => {
-    const calculatePageSize = () => {
-      // Modal height is 75% of viewport height
-      const modalHeight = window.innerHeight * 0.6;
+    const container = tableContainerRef.current;
+    if (!container) return;
 
-      // Estimate heights (in pixels):
-      // - Modal header (title + description): ~120px
-      // - Table header: ~40px
-      // - Pagination section: ~80px
-      // - Modal padding: ~64px (32px top + 32px bottom)
-      const fixedHeight = 120 + 40 + 80 + 64;
+    const observer = new ResizeObserver(() => {
+      const thead = container.querySelector("thead");
+      const theadHeight = thead?.getBoundingClientRect().height ?? 0;
+      const availableHeight = container.clientHeight - theadHeight;
+      const rowsPerPage = Math.max(3, Math.floor(availableHeight / ROW_HEIGHT));
+      setCalculatedPageSize((prev) =>
+        prev !== rowsPerPage ? rowsPerPage : prev
+      );
+    });
 
-      // Available height for table rows
-      const availableHeight = modalHeight - fixedHeight;
-
-      // Each table row is approximately 60px (including borders and padding)
-      const rowHeight = 60;
-
-      // Calculate how many rows can fit, with a minimum of 3
-      const rowsPerPage = Math.max(3, Math.floor(availableHeight / rowHeight));
-
-      setCalculatedPageSize((prev) => {
-        // Only update if the new size is significantly different to prevent flickering
-        if (Math.abs(prev - rowsPerPage) > 0) {
-          return rowsPerPage;
-        }
-        return prev;
-      });
-    };
-
-    // Initial calculation
-    calculatePageSize();
-
-    // Debounced resize handler to prevent excessive recalculation
-    let resizeTimeout: NodeJS.Timeout;
-    const debouncedCalculatePageSize = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(calculatePageSize, 100);
-    };
-
-    window.addEventListener("resize", debouncedCalculatePageSize);
-    return () => {
-      window.removeEventListener("resize", debouncedCalculatePageSize);
-      clearTimeout(resizeTimeout);
-    };
+    observer.observe(container);
+    return () => observer.disconnect();
   }, []);
 
-  // Separate effect to reset current page when page size changes
   useEffect(() => {
     setCurrentPage(1);
   }, [calculatedPageSize]);
@@ -152,7 +123,10 @@ export default function IndexAttemptErrorsModal({
             </div>
           )}
 
-          <div className="flex-1 overflow-hidden min-h-0">
+          <div
+            ref={tableContainerRef}
+            className="flex-1 overflow-hidden min-h-0"
+          >
             <Table>
               <TableHeader>
                 <TableRow>
@@ -215,32 +189,24 @@ export default function IndexAttemptErrorsModal({
             </Table>
           </div>
 
-          <div className="flex-shrink-0">
-            {paginationData.totalPages > 1 && (
-              <div className="flex-1 flex justify-center mb-2">
-                <PageSelector
-                  totalPages={paginationData.totalPages}
-                  currentPage={currentPage}
-                  onPageChange={handlePageChange}
-                />
-              </div>
-            )}
-
-            <div className="flex w-full">
-              <div className="flex gap-2 ml-auto">
-                {hasUnresolvedErrors && !isResolvingErrors && (
-                  // TODO(@raunakab): migrate to opal Button once className/iconClassName is resolved
-                  <Button
-                    onClick={onResolveAll}
-                    className="ml-4 whitespace-nowrap"
-                  >
-                    Resolve All
-                  </Button>
-                )}
-              </div>
+          {paginationData.totalPages > 1 && (
+            <div className="flex-1 flex w-full justify-center">
+              <PageSelector
+                totalPages={paginationData.totalPages}
+                currentPage={currentPage}
+                onPageChange={handlePageChange}
+              />
             </div>
-          </div>
+          )}
         </Modal.Body>
+        <Modal.Footer>
+          {hasUnresolvedErrors && !isResolvingErrors && (
+            // TODO(@raunakab): migrate to opal Button once className/iconClassName is resolved
+            <Button onClick={onResolveAll} className="ml-4 whitespace-nowrap">
+              Resolve All
+            </Button>
+          )}
+        </Modal.Footer>
       </Modal.Content>
     </Modal>
   );
