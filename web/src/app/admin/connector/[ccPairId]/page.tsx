@@ -171,8 +171,13 @@ function Main({ ccPairId }: { ccPairId: number }) {
 
     deleteCCPair(ccPair.connector.id, ccPair.credential.id, () =>
       mutate(buildCCPairInfoUrl(ccPair.id))
-    );
-    finishConnectorDeletion();
+    ).then(() => {
+      finishConnectorDeletion();
+    }).catch((error) => {
+      console.error("Error deleting connector:", error);
+      isSchedulingConnectorDeletionRef.current = false;
+      setShowDeleteConnectorConfirmModal(false);
+    });
   }, [ccPair, finishConnectorDeletion]);
 
   const latestIndexAttempt = indexAttempts?.[0];
